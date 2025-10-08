@@ -74,13 +74,14 @@ int main(void) {
     // Main while loop
     while(1){
       ang_vel = quad_count / (4.0 * 408.0); // Angular velocity in rev/s (408 PPR, 4 edges per cycle)
-      printf("Angular velocity: %.3f rev/s, Direction: %s\n", ang_vel, direction ? "CCW" : "CW");
+      printf("Angular velocity: %.3f rev/s, Direction: %s\n", direction ? -ang_vel : ang_vel, direction ? "CCW" : "CW");
       quad_count = 0;                       // Reset count
       delay_millis(TIM15, 1000);            // Update velocity and direction every second
     }
 }
 
 // Interrupt Handler for PA9 (encoder A)
+// Edge detected on EXTI5 to EXTI9 (PA5 to PA9)
 void EXTI9_5_IRQHandler(void){
     // Check that PA9 was what triggered the interrupt
     if (EXTI->PR1 & (1 << 9)){
@@ -99,6 +100,7 @@ void EXTI9_5_IRQHandler(void){
 }
 
 // Interrupt Handler for PA10 (encoder B)
+// Edge detected on EXTI10 to EXTI15 (PA10 to PA15)
 void EXTI15_10_IRQHandler(void){
     // Check that PA10 was what triggered the interrupt
     if (EXTI->PR1 & (1 << 10)){
