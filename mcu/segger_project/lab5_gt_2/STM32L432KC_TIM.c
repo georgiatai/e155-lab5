@@ -6,7 +6,7 @@
 
 void initTIM(TIM_TypeDef *TIMx) {
     // Set prescaler value
-    TIMx->PSC = 4999;
+    TIMx->PSC = 1999;
 
     // Clear UG bit (TIMx_EGR[0]) and setting it to generate an update event
     TIMx->EGR  &= ~(1 << 0);
@@ -38,7 +38,7 @@ void delay_millis(TIM_TypeDef * TIMx, uint32_t ms) {
 }
 
 float delay_polling(TIM_TypeDef* TIMX, uint32_t ms) {
-  volatile uint32_t duration = ms * 80000 / (4999 + 1);  // convert to ARR val given input clk+psc
+  volatile uint32_t duration = ms * 80000 / (1999 + 1);  // convert to ARR val given input clk+psc
   
   TIMX->EGR |=  (1 << 0);       // reset main counter via event flag
   TIMX->ARR  = duration;
@@ -72,8 +72,7 @@ float delay_polling(TIM_TypeDef* TIMX, uint32_t ms) {
     }
   }
 
-  float update_freq = 1.0 / (500 / 1000.0);
-  vel = count * update_freq * (1.0 / 408.0) / 2.0;
+  vel = count * (1.0 / 408.0) / 4.0;
   count = 0;
 
   return vel * dir;

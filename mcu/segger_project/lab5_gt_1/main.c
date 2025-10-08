@@ -76,7 +76,6 @@ int main(void) {
       quad_count = 0; // Reset count
       delay_millis(TIM15, 1000);
       
-      
     }
 
 }
