@@ -23,8 +23,8 @@ float    ang_vel    = 0.0; // Angular velocity in rev/s
 
 
 int main(void) {
-    configureFlash();
-    configureClock();
+    //configureFlash();
+    //configureClock();
 
     // 1. Enable SYSCFG clock domain in RCC
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;	
@@ -40,6 +40,8 @@ int main(void) {
     gpioEnable(GPIO_PORT_A);
     pinMode(PA9, GPIO_INPUT); // PA9 as input
     pinMode(PA10, GPIO_INPUT); // PA10 as input
+    pinMode(PA6, GPIO_OUTPUT); // PA10 as input
+
     
     GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD9, 0b00); // Set PA9 as pull-up
     GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD9, 0b01); // Set PA9 as pull-up
@@ -47,8 +49,10 @@ int main(void) {
     GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD10, 0b01); // Set PA10 as pull-up
 
     while(1){     
-      ang_vel = delay_polling(TIM15, 1000);
-      printf("velocity (manual polling): %f rev/s\n", ang_vel);
+      ang_vel = quad_count / (4.0*408.0); 
+      printf("Angular velocity (polling): %.3f rev/s, Direction: %s\n", direction ? -ang_vel : ang_vel, direction ? "CCW" : "CW");
+      quad_count = 0; // Reset count
+      togglePin(PA6);
     }
 
 }

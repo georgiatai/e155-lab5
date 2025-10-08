@@ -74,7 +74,7 @@ int main(void) {
     // Main while loop
     while(1){
       ang_vel = quad_count / (4.0 * 408.0); // Angular velocity in rev/s (408 PPR, 4 edges per cycle)
-      printf("Angular velocity: %.3f rev/s, Direction: %s\n", ang_vel, direction ? "CCW" : "CW");
+      printf("Angular velocity: %.3f rev/s, Direction: %s\n", direction ? -ang_vel : ang_vel, direction ? "CCW" : "CW");
       quad_count = 0;                       // Reset count
       delay_millis(TIM15, 1000);            // Update velocity and direction every second
     }
