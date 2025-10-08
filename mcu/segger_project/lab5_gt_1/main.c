@@ -5,8 +5,13 @@
 
 -------------------------- END-OF-HEADER -----------------------------
 
-File    : main.c
-Purpose : Generic application start
+/////////////////////////
+// main.c
+// Author: Georgia Tai, ytai@g.hmc.edu
+// Date: Oct. 5, 2025
+// 
+// Main program of the MCU for motor speed measurement.
+/////////////////////////
 
 */
 
@@ -17,105 +22,94 @@ Purpose : Generic application start
 
 #define _VAL2FLD(field, value) (((uint32_t)(value) << field ## _Pos) & field ## _Msk)
 
-signed int quad_count = 0;
-uint32_t direction  = 0;   // 0 is clockwise, 1 is counter-clockwise
-float    ang_vel    = 0.0; // Angular velocity in rev/s
+signed int quad_count = 0;   // Quadrature count (rising and falling edges of both A and B)
+uint32_t   direction  = 0;   // 0 is clockwise, 1 is counter-clockwise
+float      ang_vel    = 0.0; // Angular velocity in rev/s
 
 
 int main(void) {
     configureFlash();
     configureClock();
 
-    // 1. Enable SYSCFG clock domain in RCC
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;	
-    // Setting up clocks
-    RCC->AHB2ENR |= (1 << 0);  // GPIOA
-    RCC->APB2ENR |= (1 << 16); // TIM15
+    // Enable clocks
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN; // SYSCFG clock
+    RCC->AHB2ENR |= (1 << 0);             // GPIOA
+    RCC->APB2ENR |= (1 << 16);            // TIM15
 
-    // Initialize timer
+    // Initialize timer and timer interrupt
     initTIM(TIM15);
-    TIM15->DIER |= (1 << 0);
+    TIM15->DIER |= (1 << 0); // UIE: Update interrupt enable
 
     // Setting up GPIOA
     gpioEnable(GPIO_PORT_A);
-    pinMode(PA9, GPIO_INPUT); // PA9 as input
+    pinMode(PA9, GPIO_INPUT);  // PA9 as input
     pinMode(PA10, GPIO_INPUT); // PA10 as input
     
-    GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD9, 0b00); // Set PA9 as pull-up
-    GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD9, 0b01); // Set PA9 as pull-up
-    GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD10, 0b00); // Set PA9 as pull-up
+    GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD9, 0b00);  // Clear bits
+    GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD9, 0b01);  // Set PA9 as pull-up
+    GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD10, 0b00); // Clear bits
     GPIOA->PUPDR |= _VAL2FLD(GPIO_PUPDR_PUPD10, 0b01); // Set PA10 as pull-up
 
-
-    // 2. Configure EXTICR for the input button interrupt
-    SYSCFG->EXTICR[2] |= _VAL2FLD(SYSCFG_EXTICR3_EXTI9, 0b000); // Select PA2
-    SYSCFG->EXTICR[2] |= _VAL2FLD(SYSCFG_EXTICR3_EXTI10, 0b000); // Select PA2
+    // Configure EXTICR for two GPIO pins interrupt
+    SYSCFG->EXTICR[2] |= _VAL2FLD(SYSCFG_EXTICR3_EXTI9, 0b000);  // Select PA9
+    SYSCFG->EXTICR[2] |= _VAL2FLD(SYSCFG_EXTICR3_EXTI10, 0b000); // Select PA10
 
     // Enable interrupts globally
     __enable_irq();
 
-    // TODO: Configure interrupt for falling edge of GPIO pin for button
-    // 1. Configure mask bit
-    EXTI->IMR1 |= (1 << gpioPinOffset(PA9)); // Configure the mask bit
-    EXTI->IMR1 |= (1 << gpioPinOffset(PA10)); // Configure the mask bit
-    // 2. Disable rising edge trigger
-    EXTI->RTSR1 |= (1 << gpioPinOffset(PA9)); // Disable rising edge trigger
-    EXTI->RTSR1 |= (1 << gpioPinOffset(PA10));// Disable rising edge trigger
-    // 3. Enable falling edge trigger
-    EXTI->FTSR1 |= (1 << gpioPinOffset(PA9));// Enable falling edge trigger
-    EXTI->FTSR1 |= (1 << gpioPinOffset(PA10));// Enable falling edge trigger
-    // 4. Turn on EXTI interrupt in NVIC_ISER
+    // Configure EXTI for two GPIO pins interrupt
+    // Configure mask bit
+    EXTI->IMR1 |= (1 << gpioPinOffset(PA9));
+    EXTI->IMR1 |= (1 << gpioPinOffset(PA10));
+    // Enable rising edge trigger
+    EXTI->RTSR1 |= (1 << gpioPinOffset(PA9));
+    EXTI->RTSR1 |= (1 << gpioPinOffset(PA10));
+    // Enable falling edge trigger
+    EXTI->FTSR1 |= (1 << gpioPinOffset(PA9));
+    EXTI->FTSR1 |= (1 << gpioPinOffset(PA10));
+    // Turn on EXTI interrupt in NVIC_ISER
     __NVIC_EnableIRQ(EXTI9_5_IRQn);
     __NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-
-
+    // Main while loop
     while(1){
-      ang_vel = quad_count / (4.0*408.0); 
+      ang_vel = quad_count / (4.0 * 408.0); // Angular velocity in rev/s (408 PPR, 4 edges per cycle)
       printf("Angular velocity: %.3f rev/s, Direction: %s\n", ang_vel, direction ? "CCW" : "CW");
-      quad_count = 0; // Reset count
-      delay_millis(TIM15, 1000);
-      
+      quad_count = 0;                       // Reset count
+      delay_millis(TIM15, 1000);            // Update velocity and direction every second
     }
-
 }
 
+// Interrupt Handler for PA9 (encoder A)
 void EXTI9_5_IRQHandler(void){
-    // Check that the button was what triggered our interrupt
+    // Check that PA9 was what triggered the interrupt
     if (EXTI->PR1 & (1 << 9)){
-        // printf("PA9, A_IN %d, B_IN %d \n", digitalRead(PA9), digitalRead(PA10));
-        // If so, clear the interrupt (NB: Write 1 to reset.)
+        // Clear the interrupt
         EXTI->PR1 |= (1 << 9);
 
-        // Then toggle the LED
-        if (A_IN != B_IN) {
-            // Clockwise
+        // Use the states of A and B to determine direction and update count
+        if (A_IN != B_IN) {  // Clockwise
             quad_count++;
             direction = 0;
-        } else {
-            // Counterclockwise
+        } else {             // Counterclockwise
             quad_count--;
             direction = 1;
         }
-
     }
 }
 
+// Interrupt Handler for PA10 (encoder B)
 void EXTI15_10_IRQHandler(void){
-  
-    // Check that the button was what triggered our interrupt
+    // Check that PA10 was what triggered the interrupt
     if (EXTI->PR1 & (1 << 10)){
-        // printf("PA10, A_IN %d, B_IN %d \n", digitalRead(PA9), digitalRead(PA10));
         // If so, clear the interrupt (NB: Write 1 to reset.)
         EXTI->PR1 |= (1 << 10);
 
-        // Then toggle the LED
-        if (A_IN == B_IN) {
-            // Clockwise
+        // Use the states of A and B to determine direction and update count
+        if (A_IN == B_IN) {  // Clockwise
             quad_count++;
             direction = 0;
-        } else {
-            // Counterclockwise
+        } else {             // Counterclockwise
             quad_count--;
             direction = 1;
         }
